@@ -1,118 +1,124 @@
-// 예제: 가로 일렬 교차 배치 음악 비주얼라이저
-// p5.js + p5.sound 필요
-
 let song;
 let fft;
-let playBtn, stopBtn;
+let playing = false;
 
-let bgHue = 200;
+let colorModeType = 0; // 0: 기본색, 1: 무지개, 2: 반전
+let playButtonX = 20, playButtonY = 20, btnW = 80, btnH = 40;
 
 function preload() {
-  // 자신의 파일 경로/프로젝트 구조에 맞게 수정
-  song = loadSound("assets/alarmmusic.mp3");
+  
+  song = loadSound('assets/alarmmusic.mp3');
 }
 
 function setup() {
-  createCanvas(900, 300);
-  colorMode(HSB, 360, 100, 100);
-
-  fft = new p5.FFT(0.8, 64); // 평활화, 빈 수 64 정도
-  fft.setInput(song);
-
-  playBtn = createButton("play");
-  stopBtn = createButton("stop");
-
-  // 화면 하단 중앙 배치
-  let btnY = height - 40;
-  playBtn.position(width / 2 - 80, btnY);
-  stopBtn.position(width / 2 + 20, btnY);
-
-  playBtn.mousePressed(() => {
-    if (!song.isPlaying()) {
-      song.play();
-    }
-  });
-
-  stopBtn.mousePressed(() => {
-    if (song.isPlaying()) {
-      song.stop(); // 멈추고 처음 위치로
-    }
-  });
+  createCanvas(800, 600);
+  fft = new p5.FFT();  // 주파수 분석기
 }
 
 function draw() {
-  // 노래가 재생 중일 때만 배경 색을 랜덤하게 조금씩 변화
-  if (song.isPlaying()) {
-    bgHue += random(-3, 3);
-    bgHue = (bgHue + 360) % 360;
+  background(10);
+
+  // 버튼 
+  drawPlayStopButton();
+
+  // 음악 실행 중일 때만 비주얼라이저 그리기
+  if (playing) {
+    let spectrum = fft.analyze();
+    let amp = fft.getEnergy("bass");   // 저음
+    let treble = fft.getEnergy("treble"); // 고음
+
+    
+    let bassSize = map(amp, 0, 255, 20, 300);
+    let trebleSize = map(treble, 0, 255, 10, 200);
+
+    let c = chooseColor(amp, treble);
+
+    // ⬤ 원(ellipse) : 베이스 크기 변화
+    fill(c.r, c.g, c.b, 180);
+    noStroke();
+    ellipse(width/2, height/2, bassSize, bassSize);
+
+    // ◼ 사각형(rect) : 고음에 따라 회전/크기 변화
+    push();
+    translate(width/2, height/2);
+    rotate(frameCount * 0.01);
+    fill(c.r, c.g, c.b, 120);
+    rectMode(CENTER);
+    rect(0, 0, trebleSize * 1.2, trebleSize / 1.5);
+    pop();
+
+    // 〰 라인(line) : 주파수에 따라 흔들림
+    stroke(c.r, c.g, c.b, 200);
+    strokeWeight(3);
+    let offset = map(amp, 0, 255, -50, 50);
+    line(0, height/2 + offset, width, height/2 - offset);
   }
-  background(bgHue, 60, 20);
-
-  // 노래가 안 나올 때는 도형들도 멈춘(기본 크기) 상태로 유지
-  if (!song.isPlaying()) {
-    drawStaticShapes();
-    return;
-  }
-
-  // 재생 중일 때: FFT 분석으로 도형 크기 변동
-  let spectrum = fft.analyze(); // 0~255 값 배열
-
-  drawReactiveShapes(spectrum);
 }
 
-function drawStaticShapes() {
-  let count = 10;        // 사각형 10, 원 10
-  let baseSize = 16;     // 기본 도형 크기 (높이)
-  let gap = baseSize * 0.5;
-  let totalWidth = count * baseSize + (count - 1) * gap;
-  let startX = (width - totalWidth) / 2;
-  let y = height / 2;
 
-  noStroke();
-  fill(0, 0, 90); // 밝은 회색 계열
+//색상 모드 
+function chooseColor(amp, treble) {
+  let r, g, b;
 
-  for (let i = 0; i < count * 2; i++) {
-    let x = startX + (baseSize + gap) * i;
-    if (i % 2 === 0) {
-      rectMode(CENTER);
-      rect(x, y, baseSize, baseSize);
+  if (colorModeType === 0) {
+    // 기본: 저음 → 빨강, 고음 → 파랑
+    r = map(amp, 0, 255, 50, 255);
+    g = map(treble, 0, 255, 50, 200);
+    b = map(treble, 0, 255, 100, 255);
+
+  } else if (colorModeType === 1) {
+    // 무지개 모드
+    let hue = (frameCount % 360);
+    colorMode(HSB);
+    let col = color(hue, 255, 255);
+    colorMode(RGB);
+    r = red(col);
+    g = green(col);
+    b = blue(col);
+
+  } else if (colorModeType === 2) {
+    // 반전 모드
+    let base = map(amp + treble, 0, 510, 255, 0);
+    r = base;
+    g = 255 - base;
+    b = (amp + treble) % 255;
+  }
+
+  return { r, g, b };
+}
+
+
+//Play/Stop 버튼 UI
+function drawPlayStopButton() {
+  fill(playing ? "#ff4d4d" : "#4dff4d");
+  rect(playButtonX, playButtonY, btnW, btnH, 10);
+
+  fill(0);
+  textSize(18);
+  textAlign(CENTER, CENTER);
+  text(playing ? "STOP" : "PLAY", playButtonX + btnW/2, playButtonY + btnH/2);
+}
+
+//마우스 클릭 → 음악 토글
+function mousePressed() {
+  // 버튼 영역 클릭 체크
+  if (mouseX > playButtonX && mouseX < playButtonX + btnW &&
+      mouseY > playButtonY && mouseY < playButtonY + btnH) {
+
+    if (!playing) {
+      song.play();
+      playing = true;
     } else {
-      ellipse(x, y, baseSize, baseSize);
+      song.stop();
+      playing = false;
     }
   }
 }
 
-function drawReactiveShapes(spectrum) {
-  let count = 10;
-  let baseSize = 16;
-  let gap = baseSize * 0.5;
-  let totalWidth = (count * 2) * baseSize + ((count * 2) - 1) * gap;
-  let startX = (width - totalWidth) / 2;
-  let y = height / 2;
+//c → 색상 모드 변경
 
-  noStroke();
-
-  for (let i = 0; i < count * 2; i++) {
-    // 낮은 주파수부터 높은 주파수까지 고르게 매핑
-    let index = floor(map(i, 0, count * 2 - 1, 0, spectrum.length - 1));
-    let amp = spectrum[index]; // 0~255
-    let len = baseSize + map(amp, 0, 255, 0, 120); // 길이(높이) 증폭
-
-    // 색상도 주파수/크기에 비례해서 변화
-    let hue = map(amp, 0, 255, 180, 340);
-    let sat = map(amp, 0, 255, 40, 100);
-    let bri = map(amp, 0, 255, 50, 100);
-    fill(hue, sat, bri);
-
-    let x = startX + (baseSize + gap) * i;
-
-    if (i % 2 === 0) {
-      // 사각형: 세로 길이 len
-      rectMode(CENTER);
-      rect(x, y, baseSize, len);
-    } else {
-      // 원: 세로 지름 len
-      ellipse(x, y, baseSize, len);
-    }
+function keyPressed() {
+  if (key === 'c' || key === 'C') {
+    colorModeType = (colorModeType + 1) % 3;
   }
 }
