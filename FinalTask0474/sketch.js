@@ -20,18 +20,22 @@ function draw() {
   rect(playButtonX, playButtonY, btnW, btnH, 10);
   fill(0);
   textAlign(CENTER, CENTER);
-  text(playing ? "STOP" : "PLAY", playButtonX + btnW/2, playButtonY + btnH/2);
+  text(playing ? "STOP" : "PLAY", playButtonX + btnW/2, 
+playButtonY + btnH/2);
 
   if (playing) {
     let bass = fft.getEnergy("bass");
     let treble = fft.getEnergy("treble");
-    
+
     let bassSize = map(bass, 0, 255, 50, 200);
     let trebleSize = map(treble, 0, 255, 20, 120);
+    let shake = map(bass, 0, 255, -30, 30);
 
     ellipse(width/2, height/2, bassSize);
     rectMode(CENTER);
     rect(width/2, height/2, trebleSize, trebleSize / 2);
+
+    line(0, height/2 + shake, width, height/2 - shake);
   }
 }
 
