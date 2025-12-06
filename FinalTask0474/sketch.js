@@ -15,46 +15,56 @@ function setup() {
 }
 
 function draw() {
-  background(20);
+  background(15);
+  drawPlayStopButton();
 
+  if (playing) {
+    let spectrum = fft.analyze();
+    let bass = fft.getEnergy("bass");      
+    let treble = fft.getEnergy("treble");  
+    let bassSize = map(bass, 0, 255, 50, 300);
+    let trebleSize = map(treble, 0, 255, 20, 200);
+    let shake = map(bass, 0, 255, -60, 60);
+    let c = chooseColor(bass, treble);
+
+    fill(c.r, c.g, c.b);
+    ellipse(width/2, height/2, bassSize);
+    push();
+    translate(width/2, height/2);
+    rotate(frameCount * 0.01);
+    rectMode(CENTER);
+    rect(0, 0, trebleSize * 1.2, trebleSize / 1.2);
+    pop();
+
+    stroke(c.r, c.g, c.b);
+    line(0, height/2 + shake, width, height/2 - shake);
+  }
+}
+
+function chooseColor(bass, treble) {
+  let r, g, b;
+  if (colorModeType === 0) {
+    r = map(bass, 0, 255, 80, 255);
+    g = map(treble, 0, 255, 50, 200);
+    b = map(treble, 0, 255, 120, 255);
+  } else {
+    let hue = frameCount % 360;
+    colorMode(HSB);
+    let col = color(hue, 255, 255);
+    colorMode(RGB);
+    r = red(col);
+    g = green(col);
+    b = blue(col);
+  }
+  return { r, g, b };
+}
+
+function drawPlayStopButton() {
   fill(playing ? "#ff5959" : "#59ff59");
   rect(playButtonX, playButtonY, btnW, btnH, 10);
   fill(0);
   textAlign(CENTER, CENTER);
   text(playing ? "STOP" : "PLAY", playButtonX + btnW/2, playButtonY + btnH/2);
-
-  if (playing) {
-    let bass = fft.getEnergy("bass");
-    let treble = fft.getEnergy("treble");
-
-    let r, g, b;
-    if (colorModeType === 0) {
-      r = map(bass, 0, 255, 80, 255);
-      g = map(treble, 0, 255, 50, 200);
-      b = map(treble, 0, 255, 120, 255);
-    } else {
-      let hue = frameCount % 360;
-      colorMode(HSB);
-      let col = color(hue, 255, 255);
-      colorMode(RGB);
-      r = red(col);
-      g = green(col);
-      b = blue(col);
-    }
-
-    let bassSize = map(bass, 0, 255, 50, 300);
-    let trebleSize = map(treble, 0, 255, 20, 200);
-    let shake = map(bass, 0, 255, -60, 60);
-
-    fill(r, g, b);
-    ellipse(width/2, height/2, bassSize);
-    rectMode(CENTER);
-    rect(width/2, height/2, trebleSize * 1.2, trebleSize / 1.2);
-
-    stroke(r, g, b);
-    strokeWeight(4);
-    line(0, height/2 + shake, width, height/2 - shake);
-  }
 }
 
 function mousePressed() {
